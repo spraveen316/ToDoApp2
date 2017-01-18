@@ -1,25 +1,21 @@
 package com.praveens.todoapp;
 
 import android.content.Intent;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.util.Log;
+import android.support.v7.app.AppCompatActivity;
 import android.view.View;
-import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.Toast;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
-
-import static android.R.attr.id;
-import static android.R.attr.name;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -80,6 +76,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onAddItem(View view) {
+        if (StringUtils.isBlank(etEditText.getText().toString())) {
+            Toast.makeText(this, "Cannot add empty item", Toast.LENGTH_SHORT).show();
+            return;
+        }
         aToDoAdapter.add(etEditText.getText().toString());
         etEditText.setText("");
         writeItems();
@@ -90,7 +90,12 @@ public class MainActivity extends AppCompatActivity {
         if (resultCode == RESULT_OK && requestCode == REQUEST_CODE) {
             String editedText = data.getExtras().getString("editedText");
             int editItemPosition = data.getExtras().getInt("editItemPosition");
-            todoItems.set(editItemPosition, editedText);
+            if (StringUtils.isBlank(editedText)) {
+                // if edited item is blank it is treated as a remove
+                todoItems.remove(editItemPosition);
+            } else {
+                todoItems.set(editItemPosition, editedText);
+            }
             aToDoAdapter.notifyDataSetChanged();
             writeItems();
         }

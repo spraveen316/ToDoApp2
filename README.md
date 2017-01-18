@@ -25,7 +25,8 @@ The following **optional** features are implemented:
 
 The following **additional** features are implemented:
 
-* [ ] List anything else that you can get done to improve the app functionality!
+* [X] Validation - Cannot add empty item. A Toast message is shown in such a case.
+* [X] When Edit Item is made blank and Save button is clicked it is treated as a remove.
 
 ## Video Walkthrough
 
