@@ -3,11 +3,15 @@ package com.praveens.todoapp;
 import android.content.Intent;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.Toast;
+
+import com.praveens.todoapp.model.Todo;
+import com.praveens.todoapp.sqllite.TodoItemDatabaseHelper;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -16,11 +20,15 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.List;
+
+import static android.R.attr.id;
+import static android.content.ContentValues.TAG;
 
 public class MainActivity extends AppCompatActivity {
 
-    ArrayList<String> todoItems;
-    ArrayAdapter<String> aToDoAdapter;
+    List<Todo> todoItems;
+    ArrayAdapter<Todo> aToDoAdapter;
     ListView lvItems;
     EditText etEditText;
     private final int REQUEST_CODE = 20;
@@ -34,15 +42,15 @@ public class MainActivity extends AppCompatActivity {
         lvItems.setAdapter(aToDoAdapter);
         etEditText = (EditText) findViewById(R.id.etEditText);
         lvItems.setOnItemLongClickListener((adapterView, view, position, id) -> {
-            todoItems.remove(position);
+            removeItem(position);
             aToDoAdapter.notifyDataSetChanged();
-            writeItems();
             return true;
         });
 
         lvItems.setOnItemClickListener((adapterView, view, position, id) -> {
             Intent i = new Intent(this, EditItemActivity.class);
-            i.putExtra("editItem", todoItems.get(position));
+            i.putExtra("editItemId", todoItems.get(position).id);
+            i.putExtra("editItemText", todoItems.get(position).text);
             i.putExtra("editItemPosition", position);
             startActivityForResult(i, REQUEST_CODE);
         });
@@ -50,29 +58,30 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void readItems() {
-        File fileDirs = getFilesDir();
-        File file = new File(fileDirs, "todo.txt");
-        try {
-            todoItems = new ArrayList<String>(FileUtils.readLines(file, Charset.defaultCharset()));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        TodoItemDatabaseHelper dbHelper = TodoItemDatabaseHelper.getInstance(this);
+        todoItems = dbHelper.getAllTodos();
     }
 
-    private void writeItems() {
-        File fileDirs = getFilesDir();
-        File file = new File(fileDirs, "todo.txt");
-        try {
-            FileUtils.writeLines(file, todoItems);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+    private void removeItem(int removeItemPosition) {
+        TodoItemDatabaseHelper dbHelper = TodoItemDatabaseHelper.getInstance(this);
+        dbHelper.deleteTodo(todoItems.get(removeItemPosition));
+        todoItems.remove(removeItemPosition);
+    }
+
+    private long writeItem(Todo todo) {
+        TodoItemDatabaseHelper dbHelper = TodoItemDatabaseHelper.getInstance(this);
+        return dbHelper.addTodo(todo);
+    }
+
+    private long updateItem(Todo todo) {
+        TodoItemDatabaseHelper dbHelper = TodoItemDatabaseHelper.getInstance(this);
+        return dbHelper.updateToDo(todo);
     }
 
     public void populateArrayItems() {
-        todoItems = new ArrayList<String>();
+        todoItems = new ArrayList<Todo>();
         readItems();
-        aToDoAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, todoItems);
+        aToDoAdapter = new ArrayAdapter<Todo>(this, android.R.layout.simple_list_item_1, todoItems);
     }
 
     public void onAddItem(View view) {
@@ -80,9 +89,10 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "Cannot add empty item", Toast.LENGTH_SHORT).show();
             return;
         }
-        aToDoAdapter.add(etEditText.getText().toString());
+        Todo addItem = new Todo(etEditText.getText().toString());
+        addItem.id = writeItem(addItem);
+        aToDoAdapter.add(addItem);
         etEditText.setText("");
-        writeItems();
     }
 
     @Override
@@ -90,14 +100,19 @@ public class MainActivity extends AppCompatActivity {
         if (resultCode == RESULT_OK && requestCode == REQUEST_CODE) {
             String editedText = data.getExtras().getString("editedText");
             int editItemPosition = data.getExtras().getInt("editItemPosition");
+            long editItemId = data.getExtras().getLong("editItemId");
+            Log.d(TAG, "in onActivityResult, editedText=" + editedText + ", editItemPosition=" + editItemPosition + ", editItemId=" + editItemId);
             if (StringUtils.isBlank(editedText)) {
                 // if edited item is blank it is treated as a remove
-                todoItems.remove(editItemPosition);
+                removeItem(editItemPosition);
             } else {
-                todoItems.set(editItemPosition, editedText);
+                TodoItemDatabaseHelper dbHelper = TodoItemDatabaseHelper.getInstance(this);
+                Todo addItem = dbHelper.getTodo(editItemId);
+                addItem.text = editedText;
+                addItem.id = updateItem(addItem);
+                todoItems.set(editItemPosition, addItem);
             }
             aToDoAdapter.notifyDataSetChanged();
-            writeItems();
         }
     }
 }
